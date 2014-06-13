@@ -1,0 +1,232 @@
+<html>
+<head>
+    <title>Web SQL Demo</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    　　<link rel="stylesheet"  href="css/jquery.mobile-1.4.2.min.css">
+    　　<script src="js/jquery-2.0.2.min.js"></script>
+    　　<script src="js/jquery.mobile-1.4.2.min.js"></script>
+    <script>
+        //获取并显示本地存储信息
+        function getStorage(type) {
+            var storage = window[type + 'Storage'],
+                    delta = 0,
+                    li = document.createElement('li');
+
+            if (!window[type + 'Storage']) return;
+
+            if (storage.getItem('value')) {
+                delta = ((new Date()).getTime() - (new Date()).setTime(storage.getItem('timestamp'))) / 1000;
+
+                li.innerHTML = type + 'Storage: ' + storage.getItem('value') + ' (上次修改是在: ' + delta + 's 之前)';
+            } else {
+                li.innerHTML = type + 'Storage 空';
+            }
+
+            document.querySelector('#previous').appendChild(li);
+        }
+
+
+
+
+        //打开本地数据库
+        function openDB() {
+            var db = openDatabase(
+                    "body_building_db",             // 数据库的短名字
+                    "1.0",                          // 数据库的版本
+                    "Database for body building",   // 数据库的长名字
+                    1024*1024                       // 允许的最大尺寸（字节为单位）
+            );
+            return db;
+        }
+
+        //创建数据库结构和内容
+        function createBodyBuildingTable(db) {
+            var sql = "CREATE TABLE IF NOT EXISTS body_building (id INTEGER PRIMARY KEY AUTOINCREMENT, note TEXT, date DATE);";
+            db.transaction(function (tx) {
+                        tx.executeSql(
+                                sql,  // 要执行的SQL语句
+                                [],   // SQL语句的参数列表
+                                function () { // 成功的回调函数
+                                    // 插入样本数据
+                                    record = {note: "今天练了两个小时", date: new Date(2012, 2, 1)};
+                                    insertRecord(db, record);
+                                    record = {note: "今天重点练习了腰部", date: new Date(2012, 2, 4)};
+                                    insertRecord(db, record);
+                                    record = {note: "手臂练得好疼", date: new Date(2012, 2, 7)};
+                                    insertRecord(db, record);
+                                    record = {note: "洗完澡，称了一下，增重了，呵呵", date: new Date(2012, 2, 11)};
+                                    insertRecord(db, record);
+                                },
+                                statementErrorCallback // 语句执行失败的回调函数
+                        );
+                        console.log("Execute sql...");
+                    }, transactionErrorCallback  // 事务创建失败的回调函数
+            );
+            console.log("create table...");
+        }
+
+        function transactionErrorCallback(error) {
+            alert("Error: " + error.message);
+        }
+
+        function statementErrorCallback(transaction, error) {
+            alert("Error: " + error.message);
+        }
+
+        //插入数据
+        function insertRecord(db, bodyBuildingRecord) {
+            var sql = "INSERT INTO body_building (note, date) VALUES (?,?);"
+            db.transaction(function (tx) {
+                tx.executeSql(
+                        sql,
+                        [bodyBuildingRecord.note, bodyBuildingRecord.date], // SQL语句的参数列表
+                        function() {
+                            console.log('success');
+                        },
+                        statementErrorCallback
+                );
+            });
+        }
+
+        //获取并显示数据库记录
+        function getRecords(db) {
+            var sql = "SELECT * FROM body_building;";
+            db.transaction(function (tx) {
+                tx.executeSql(
+                        sql,
+                        [], // SQL语句的参数列表
+                        function(transaction, resultSet) {
+                            var rows = resultSet.rows;
+                            $("#body_building").text("");
+                            for (var i = 0; i < rows.length; i++) {
+                                // 每条记录显示为一个列表项
+                                $("#body_building").append('<li>'+ rows.item(i).note + ' ' + '</li>');
+                            }
+                        },
+                        statementErrorCallback
+                );
+            });
+        }
+
+        function clearRecord(db){
+            var sql = "delete  FROM body_building;";
+            db.transaction(function (tx) {
+                tx.executeSql(
+                        sql,
+                        [], // SQL语句的参数列表
+                        function(transaction, resultSet) {
+                            $("#body_building").text('删除了所有行');
+                        },
+                        statementErrorCallback
+                );
+            });
+        }
+
+        // 应用入口点
+        window.addEventListener("load", function() {
+
+            //修改并记录sessionStorage变量
+            $('#session_input').on('keyup', function () {
+                sessionStorage.setItem('value', this.value);
+                sessionStorage.setItem('timestamp', (new Date()).getTime());
+            });
+            //修改并记录localStorage变量
+            $('#local_input').on('keyup',function () {
+                localStorage.setItem('value', this.value);
+                localStorage.setItem('timestamp', (new Date()).getTime());
+            });
+
+            //清除本地存储按钮操作
+            $('#clear').on('click', function () {
+                sessionStorage.clear();
+                localStorage.clear();
+
+                document.querySelector('#previous').innerHTML = '';
+                getStorage('local');
+                getStorage('session');
+            });
+            //显示本地存储
+            $("#showvalue").on("click",function(){
+                getStorage('local');
+                getStorage('session');
+            });
+
+
+
+            var db = openDB();
+            $("#insertrow_button").click(function() {
+                // 插入一行数据
+                record = {note: $("#itemvalue").val(), date: new Date()};
+                insertRecord(db, record);
+            });
+            $("#insert_button").click(function() {
+                // 批量插入数据
+                createBodyBuildingTable(db);
+            });
+            $("#load_button").click(function() {
+                // 获取数据并更新页面
+                getRecords(db);
+            });
+            $("#clear_database").click(function(){
+                //清除数据
+                clearRecord(db);
+            })
+        },false);
+
+
+    </script>
+</head>
+<body >
+<div data-role="page" id="client-side-storage">
+    <div data-role="header">
+        <h3>本地数据存储示例</h3>
+    </div>
+    <div data-role="content">
+        <a href="#localStorage" data-role="button">localStorage示例</a>
+        <a href="#WebSQLDatabase" data-role="button">Web SQL Database示例</a>
+    </div>
+    <div data-role="footer">
+        <h3>Copyright GDMEC 2014</h3>
+    </div>
+</div>
+<div data-role="page" id="WebSQLDatabase">
+    <div data-role="header">
+        <h3>Web SQL Database</h3>
+    </div>
+    <input type="text" id="itemvalue" value="再不锻炼就老了！">
+    <input type="button" id="insertrow_button" value="插入一行数据"/>
+    <input type="button" id="insert_button" value="批量插入数据" />
+    <input type="button" id="load_button" value="显示数据" />
+    <input type="button" id="clear_database" value="清除所有数据"/>
+    <ul id="body_building"></ul>
+</div>
+<div data-role="footer">
+    <h3>Copyright GDMEC 2014</h3>
+</div>
+</div>
+<div data-role="page" id="localStorage">
+    <div data-role="header">
+        <h3>localStorage 示例</h3>
+    </div>
+    <div data-role="content">
+        <p>使用本地存储，键值名称value，在触发input的keyup事件修改本地存储数值</p>
+        <p>本地存储修改记录:</p>
+        <ul id="previous"></ul>
+        <div>
+            <label for="session_input">sessionStorage:</label>
+            <input type="text" name="session" value="" id="session_input" />
+        </div>
+        <div>
+            <label for="local_input">localStorage:</label>
+            <input type="text" name="local" value="" id="local_input" />
+        </div>
+        <input type="button" id="showvalue" value="显示localStorage" />
+        <input type="button" id="clear" value="清除localStorage" />
+    </div>
+    <div data-role="footer">
+        <h3>Copyright GDMEC 2014</h3>
+    </div>
+</div>
+</body>
+</html>
